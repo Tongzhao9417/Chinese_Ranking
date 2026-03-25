@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 中科院分区查询</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+.header { background: linear-gradient(135deg, #1a365d, #2563eb); color: white; padding: 2rem 1rem; text-align: center; }
+.header h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+.header p { opacity: 0.8; font-size: 0.9rem; }
+.container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+.search-box { background: white; border-radius: 12px; padding: 1.2rem; margin-top: -1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; z-index: 1; }
+.search-row { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+.search-row input[type="text"] { flex: 1; min-width: 200px; padding: 0.6rem 1rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+.search-row input:focus { border-color: #2563eb; }
+.search-row select { padding: 0.6rem 0.8rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; background: white; outline: none; cursor: pointer; }
+.search-row label { font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+.stats { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #6b7280; }
+table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-top: 0.5rem; }
+thead th { background: #f8fafc; padding: 0.7rem 0.8rem; text-align: left; font-size: 0.85rem; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+tbody td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; white-space: nowrap; }
+tbody tr:hover { background: #f0f7ff; }
+.zone-badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+.zone-1 { background: #fef3c7; color: #92400e; }
+.zone-2 { background: #dbeafe; color: #1e40af; }
+.zone-3 { background: #d1fae5; color: #065f46; }
+.zone-4 { background: #f3f4f6; color: #374151; }
+.top-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: #fee2e2; color: #dc2626; }
+.empty { text-align: center; padding: 3rem 1rem; color: #9ca3af; }
+.footer { text-align: center; padding: 2rem 1rem; font-size: 0.8rem; color: #9ca3af; }
+@media (max-width: 640px) {
+  .header h1 { font-size: 1.3rem; }
+  thead th, tbody td { padding: 0.4rem; font-size: 0.8rem; }
+  .hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>2026 中科院分区查询</h1>
+  <p>Chinese Academy of Sciences Journal Ranking 2026</p>
+</div>
+<div class="container">
+  <div class="search-box">
+    <div class="search-row">
+      <input type="text" id="q" placeholder="输入刊名、ISSN 或 EISSN 搜索..." autofocus>
+      <select id="zoneFilter">
+        <option value="">全部分区</option>
+        <option value="1区">1区</option>
+        <option value="2区">2区</option>
+        <option value="3区">3区</option>
+        <option value="4区">4区</option>
+      </select>
+      <select id="catFilter">
+        <option value="">全部学科</option>
+      </select>
+      <label><input type="checkbox" id="topOnly"> 仅TOP</label>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>刊名</th><th class="hide-sm">ISSN</th><th class="hide-sm">EISSN</th><th>学科</th><th>分区</th><th>TOP</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">未找到匹配的期刊</div>
+</div>
+<div class="footer">数据来源：中科院期刊分区表 2026 版（新锐分区）</div>
+
+<script>
+let DATA=[];
+const tbody=document.getElementById('tbody');
+const stats=document.getElementById('stats');
+const empty=document.getElementById('empty');
+const qInput=document.getElementById('q');
+const zoneFilter=document.getElementById('zoneFilter');
+const catFilter=document.getElementById('catFilter');
+const topOnly=document.getElementById('topOnly');
+
+function normalize(d){
+  let zone=(d[5]||'').replace(/\s/g,'');
+  let top=String(d[6]||'').trim().toUpperCase()==='TOP';
+  return {id:d[0],name:d[1],issn:d[2],eissn:d[3],cat:d[4],zone:zone,top:top};
+}
+
+function zoneClass(z){
+  if(z==='1区')return'zone-1';if(z==='2区')return'zone-2';
+  if(z==='3区')return'zone-3';return'zone-4';
+}
+
+function render(){
+  let q=qInput.value.trim().toLowerCase();
+  let zf=zoneFilter.value;
+  let cf=catFilter.value;
+  let tf=topOnly.checked;
+  let results=DATA.filter(d=>{
+    if(zf&&d.zone!==zf)return false;
+    if(cf&&d.cat!==cf)return false;
+    if(tf&&!d.top)return false;
+    if(q){
+      return d.name.toLowerCase().includes(q)||
+        d.issn.toLowerCase().includes(q)||
+        d.eissn.toLowerCase().includes(q);
+    }
+    return true;
+  });
+  results.sort((a,b)=>{
+    let za=parseInt(a.zone)||9,zb=parseInt(b.zone)||9;
+    if(za!==zb)return za-zb;
+    if(a.top!==b.top)return a.top?-1:1;
+    return 0;
+  });
+  stats.textContent=`共 ${results.length} 条结果（总计 ${DATA.length} 本期刊）`;
+  if(results.length===0){
+    tbody.innerHTML='';empty.style.display='block';return;
+  }
+  empty.style.display='none';
+  let limit=results.length>500?500:results.length;
+  let html='';
+  for(let i=0;i<limit;i++){
+    let d=results[i];
+    html+=`<tr>
+      <td>${d.id}</td><td style="white-space:normal"><strong>${esc(d.name)}</strong></td>
+      <td class="hide-sm">${esc(d.issn)}</td><td class="hide-sm">${esc(d.eissn)}</td>
+      <td>${esc(d.cat)}</td>
+      <td><span class="zone-badge ${zoneClass(d.zone)}">${esc(d.zone)}</span></td>
+      <td>${d.top?'<span class="top-badge">TOP</span>':''}</td></tr>`;
+  }
+  if(results.length>500) html+=`<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem">显示前 500 条，请缩小搜索范围...</td></tr>`;
+  tbody.innerHTML=html;
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+let debounceTimer;
+qInput.addEventListener('input',()=>{clearTimeout(debounceTimer);debounceTimer=setTimeout(render,200);});
+zoneFilter.addEventListener('change',render);
+catFilter.addEventListener('change',render);
+topOnly.addEventListener('change',render);
+
+fetch('data.json').then(r=>r.json()).then(raw=>{
+  DATA=raw.map(normalize);
+  let cats=[...new Set(DATA.map(d=>d.cat))].filter(Boolean).sort();
+  cats.forEach(c=>{let o=document.createElement('option');o.value=c;o.textContent=c;catFilter.appendChild(o);});
+  render();
+});
+</script>
+</body>
+</html>
