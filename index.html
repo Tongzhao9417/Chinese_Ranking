@@ -123,7 +123,7 @@ function render(){
   for(let i=0;i<limit;i++){
     let d=results[i];
     html+=`<tr>
-      <td>${d.id}</td><td style="white-space:normal"><strong>${esc(d.name)}</strong></td>
+      <td>${i+1}</td><td style="white-space:normal"><strong>${esc(d.name)}</strong></td>
       <td class="hide-sm">${esc(d.issn)}</td><td class="hide-sm">${esc(d.eissn)}</td>
       <td>${esc(d.cat)}</td>
       <td><span class="zone-badge ${zoneClass(d.zone)}">${esc(d.zone)}</span></td>
